@@ -2,9 +2,11 @@ import { NoteForm } from "@/components/note-form"
 
 export default async function NuevaNotaPage({
   searchParams,
-}: { searchParams: Promise<{ type?: string }> | { type?: string } }) {
-  // Manejar tanto Promise<{ type?: string }> como { type?: string }
-  const resolvedParams = await Promise.resolve(searchParams)
+}: {
+  searchParams: Promise<{ type?: string }>
+}) {
+  // Esperamos a que se resuelva searchParams antes de acceder a sus propiedades
+  const resolvedParams = await searchParams
   const type = resolvedParams.type
 
   return (

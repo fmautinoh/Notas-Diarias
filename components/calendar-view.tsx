@@ -1,14 +1,25 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday } from "date-fns"
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameMonth,
+  isSameDay,
+  isToday,
+  startOfWeek,
+  endOfWeek,
+  addDays,
+} from "date-fns"
 import { es } from "date-fns/locale"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getTasksByDate } from "@/lib/actions" // Importamos la Server Action en lugar de la función de DB
+import { getTasksByDate } from "@/lib/actions" // Importamos la Server Action
 
 export function CalendarView() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -16,18 +27,31 @@ export function CalendarView() {
   const [tasks, setTasks] = useState([])
   const [isLoading, setIsLoading] = useState(false)
 
+  // Obtenemos el primer día del mes
   const monthStart = startOfMonth(currentMonth)
-  const monthEnd = endOfMonth(currentMonth)
-  const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd })
 
+  // Obtenemos el último día del mes
+  const monthEnd = endOfMonth(currentMonth)
+
+  // Obtenemos el primer día de la semana del primer día del mes
+  // Usamos 1 como inicio de semana (lunes) para la localización española
+  const startDate = startOfWeek(monthStart, { weekStartsOn: 1 })
+
+  // Obtenemos el último día de la semana del último día del mes
+  const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 })
+
+  // Generamos todos los días que se mostrarán en el calendario
+  const calendarDays = eachDayOfInterval({ start: startDate, end: endDate })
+
+  // Días de la semana en español, comenzando por lunes
   const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 
   const prevMonth = () => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
+    setCurrentMonth((prev) => addDays(prev, -30))
   }
 
   const nextMonth = () => {
-    setCurrentMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
+    setCurrentMonth((prev) => addDays(prev, 30))
   }
 
   const fetchTasksForDate = async (date) => {
@@ -76,7 +100,7 @@ export function CalendarView() {
               </div>
             ))}
 
-            {monthDays.map((day) => {
+            {calendarDays.map((day) => {
               const isCurrentMonth = isSameMonth(day, currentMonth)
               const isSelected = isSameDay(day, selectedDate)
               const isTodayDate = isToday(day)
