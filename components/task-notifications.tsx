@@ -2,24 +2,33 @@
 
 import { useState, useEffect } from "react"
 import { differenceInHours, parseISO } from "date-fns"
-import { Bell, BellOff } from "lucide-react"
+import { Bell, BellOff, BellDot } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
 import { getUpcomingTasks } from "@/lib/actions"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 export function TaskNotifications() {
   const [mounted, setMounted] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "default">("default")
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unknown">("unknown")
+  const [isSupported, setIsSupported] = useState(false)
+  const [isSecureContext, setIsSecureContext] = useState(false)
   const { toast } = useToast()
 
   // Solo ejecutar código del lado del cliente después del montaje
   useEffect(() => {
     setMounted(true)
 
+    // Verificar si estamos en un contexto seguro
+    if (typeof window !== "undefined") {
+      setIsSecureContext(window.isSecureContext)
+    }
+
     // Verificar si las notificaciones están soportadas
     if (typeof window !== "undefined" && "Notification" in window) {
+      setIsSupported(true)
       setNotificationPermission(Notification.permission)
 
       // Restaurar el estado de las notificaciones desde localStorage
@@ -32,10 +41,19 @@ export function TaskNotifications() {
 
   // Solicitar permiso para notificaciones
   const requestPermission = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
+    if (!isSupported) {
       toast({
         title: "Notificaciones no soportadas",
         description: "Tu navegador no soporta notificaciones de escritorio.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!isSecureContext) {
+      toast({
+        title: "Contexto no seguro",
+        description: "Las notificaciones requieren un contexto seguro (HTTPS).",
         variant: "destructive",
       })
       return
@@ -59,11 +77,16 @@ export function TaskNotifications() {
           body: "Recibirás alertas cuando tus tareas estén próximas a vencer.",
           icon: "/favicon.ico",
         })
-      } else {
+      } else if (permission === "denied") {
         toast({
           title: "Permiso denegado",
-          description: "No podrás recibir notificaciones de tareas próximas a vencer.",
+          description: "Has bloqueado las notificaciones. Revisa la configuración de tu navegador.",
           variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "Permiso pendiente",
+          description: "No has tomado una decisión sobre las notificaciones.",
         })
       }
     } catch (error) {
@@ -97,7 +120,7 @@ export function TaskNotifications() {
 
   // Verificar tareas próximas a vencer
   useEffect(() => {
-    if (!mounted || !notificationsEnabled) return
+    if (!mounted || !notificationsEnabled || notificationPermission !== "granted") return
 
     // Función para verificar tareas
     const checkUpcomingTasks = async () => {
@@ -113,11 +136,23 @@ export function TaskNotifications() {
 
           // Notificar si la tarea está entre 23 y 24 horas para vencer
           if (hoursRemaining >= 23 && hoursRemaining <= 24) {
-            new Notification("Tarea próxima a vencer", {
-              body: `"${task.title}" vence en aproximadamente 24 horas.`,
-              icon: "/favicon.ico",
-              tag: `task-${task.id}`, // Evitar notificaciones duplicadas
-            })
+            // Verificar si ya se ha notificado esta tarea
+            const notifiedTasks = JSON.parse(localStorage.getItem("notifiedTasks") || "[]")
+            if (!notifiedTasks.includes(task.id)) {
+              try {
+                new Notification("Tarea próxima a vencer", {
+                  body: `"${task.title}" vence en aproximadamente 24 horas.`,
+                  icon: "/favicon.ico",
+                  tag: `task-${task.id}`, // Evitar notificaciones duplicadas
+                })
+
+                // Guardar que ya se ha notificado esta tarea
+                notifiedTasks.push(task.id)
+                localStorage.setItem("notifiedTasks", JSON.stringify(notifiedTasks))
+              } catch (error) {
+                console.error("Error al mostrar notificación:", error)
+              }
+            }
           }
         })
       } catch (error) {
@@ -133,7 +168,7 @@ export function TaskNotifications() {
 
     // Limpiar intervalo al desmontar
     return () => clearInterval(intervalId)
-  }, [mounted, notificationsEnabled])
+  }, [mounted, notificationsEnabled, notificationPermission])
 
   // No renderizar nada en el servidor o antes del montaje en el cliente
   if (!mounted) {
@@ -145,25 +180,76 @@ export function TaskNotifications() {
     )
   }
 
-  // Verificar si las notificaciones están soportadas
-  const notificationsSupported = typeof window !== "undefined" && "Notification" in window
-  if (!notificationsSupported) {
-    return null
+  // Si no hay soporte para notificaciones o no estamos en un contexto seguro, mostrar un botón deshabilitado
+  if (!isSupported || !isSecureContext) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="outline" size="icon" disabled>
+              <BellOff className="h-[1.2rem] w-[1.2rem]" />
+              <span className="sr-only">Notificaciones no disponibles</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            {!isSupported ? "Tu navegador no soporta notificaciones" : "Las notificaciones requieren HTTPS"}
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  // Si el permiso ha sido denegado, mostrar un botón especial
+  if (notificationPermission === "denied") {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                toast({
+                  title: "Notificaciones bloqueadas",
+                  description:
+                    "Has bloqueado las notificaciones. Revisa la configuración de tu navegador para permitirlas.",
+                  variant: "destructive",
+                })
+              }}
+            >
+              <BellDot className="h-[1.2rem] w-[1.2rem] text-destructive" />
+              <span className="sr-only">Notificaciones bloqueadas</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Notificaciones bloqueadas. Revisa la configuración de tu navegador.</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
   }
 
   return (
-    <Button
-      variant="outline"
-      size="icon"
-      onClick={toggleNotifications}
-      title={notificationsEnabled ? "Desactivar notificaciones" : "Activar notificaciones"}
-    >
-      {notificationsEnabled ? (
-        <Bell className="h-[1.2rem] w-[1.2rem]" />
-      ) : (
-        <BellOff className="h-[1.2rem] w-[1.2rem]" />
-      )}
-      <span className="sr-only">{notificationsEnabled ? "Desactivar notificaciones" : "Activar notificaciones"}</span>
-    </Button>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="icon" onClick={toggleNotifications}>
+            {notificationsEnabled ? (
+              <Bell className="h-[1.2rem] w-[1.2rem]" />
+            ) : (
+              <BellOff className="h-[1.2rem] w-[1.2rem]" />
+            )}
+            <span className="sr-only">
+              {notificationsEnabled ? "Desactivar notificaciones" : "Activar notificaciones"}
+            </span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {notificationPermission === "granted"
+            ? notificationsEnabled
+              ? "Desactivar notificaciones"
+              : "Activar notificaciones"
+            : "Solicitar permiso para notificaciones"}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   )
 }
