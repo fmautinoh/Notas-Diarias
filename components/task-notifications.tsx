@@ -9,16 +9,17 @@ import { useToast } from "@/components/ui/use-toast"
 import { getUpcomingTasks } from "@/lib/actions"
 
 export function TaskNotifications() {
+  const [mounted, setMounted] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "default">("default")
   const { toast } = useToast()
 
-  // Verificar si las notificaciones están soportadas
-  const notificationsSupported = typeof window !== "undefined" && "Notification" in window
-
-  // Verificar el estado del permiso al cargar el componente
+  // Solo ejecutar código del lado del cliente después del montaje
   useEffect(() => {
-    if (notificationsSupported) {
+    setMounted(true)
+
+    // Verificar si las notificaciones están soportadas
+    if (typeof window !== "undefined" && "Notification" in window) {
       setNotificationPermission(Notification.permission)
 
       // Restaurar el estado de las notificaciones desde localStorage
@@ -27,11 +28,11 @@ export function TaskNotifications() {
         setNotificationsEnabled(true)
       }
     }
-  }, [notificationsSupported])
+  }, [])
 
   // Solicitar permiso para notificaciones
   const requestPermission = async () => {
-    if (!notificationsSupported) {
+    if (typeof window === "undefined" || !("Notification" in window)) {
       toast({
         title: "Notificaciones no soportadas",
         description: "Tu navegador no soporta notificaciones de escritorio.",
@@ -96,7 +97,7 @@ export function TaskNotifications() {
 
   // Verificar tareas próximas a vencer
   useEffect(() => {
-    if (!notificationsEnabled) return
+    if (!mounted || !notificationsEnabled) return
 
     // Función para verificar tareas
     const checkUpcomingTasks = async () => {
@@ -132,8 +133,20 @@ export function TaskNotifications() {
 
     // Limpiar intervalo al desmontar
     return () => clearInterval(intervalId)
-  }, [notificationsEnabled])
+  }, [mounted, notificationsEnabled])
 
+  // No renderizar nada en el servidor o antes del montaje en el cliente
+  if (!mounted) {
+    return (
+      <Button variant="outline" size="icon">
+        <span className="h-[1.2rem] w-[1.2rem]" />
+        <span className="sr-only">Cargando notificaciones</span>
+      </Button>
+    )
+  }
+
+  // Verificar si las notificaciones están soportadas
+  const notificationsSupported = typeof window !== "undefined" && "Notification" in window
   if (!notificationsSupported) {
     return null
   }

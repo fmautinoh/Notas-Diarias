@@ -10,13 +10,16 @@ import { useToast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export function NotificationSettings() {
+  const [mounted, setMounted] = useState(false)
   const [notificationsSupported, setNotificationsSupported] = useState(false)
   const [notificationsEnabled, setNotificationsEnabled] = useState(false)
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "default">("default")
   const { toast } = useToast()
 
-  // Verificar si las notificaciones están soportadas
+  // Solo ejecutar código del lado del cliente después del montaje
   useEffect(() => {
+    setMounted(true)
+
     if (typeof window !== "undefined" && "Notification" in window) {
       setNotificationsSupported(true)
       setNotificationPermission(Notification.permission)
@@ -113,6 +116,11 @@ export function NotificationSettings() {
       title: "Notificación enviada",
       description: "Se ha enviado una notificación de prueba.",
     })
+  }
+
+  // No renderizar nada en el servidor o antes del montaje en el cliente
+  if (!mounted) {
+    return <div>Cargando configuración de notificaciones...</div>
   }
 
   if (!notificationsSupported) {

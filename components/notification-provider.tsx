@@ -2,13 +2,17 @@
 
 import type React from "react"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { differenceInHours, parseISO } from "date-fns"
 import { getUpcomingTasks } from "@/lib/actions"
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
-  // Verificar tareas próximas a vencer
+  const [mounted, setMounted] = useState(false)
+
+  // Solo ejecutar código del lado del cliente después del montaje
   useEffect(() => {
+    setMounted(true)
+
     // Verificar si las notificaciones están habilitadas
     const notificationsEnabled = localStorage.getItem("notificationsEnabled") === "true"
     if (!notificationsEnabled) return
@@ -62,7 +66,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     // Limpiar intervalo al desmontar
     return () => clearInterval(intervalId)
-  }, [])
+  }, [mounted])
 
   return <>{children}</>
 }
