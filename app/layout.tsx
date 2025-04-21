@@ -3,6 +3,8 @@ import "@/app/globals.css"
 import { Inter } from "next/font/google"
 import { ThemeProvider } from "@/components/theme-provider"
 import { NavBar } from "@/components/nav-bar"
+import { NotificationProvider } from "@/components/notification-provider"
+import { Toaster } from "@/components/ui/toaster"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -21,8 +23,11 @@ export default function RootLayout({
     <html lang="es" suppressHydrationWarning>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          <NavBar />
-          <main className="min-h-screen bg-background pt-16">{children}</main>
+          <NotificationProvider>
+            <NavBar />
+            <main className="min-h-screen bg-background pt-16">{children}</main>
+            <Toaster />
+          </NotificationProvider>
         </ThemeProvider>
       </body>
     </html>

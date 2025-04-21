@@ -7,6 +7,7 @@ import { useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { ModeToggle } from "@/components/mode-toggle"
+import { TaskNotifications } from "@/components/task-notifications"
 
 export function NavBar() {
   const pathname = usePathname()
@@ -50,11 +51,13 @@ export function NavBar() {
               </Button>
             </Link>
           ))}
+          <TaskNotifications />
           <ModeToggle />
         </nav>
 
         {/* Menú móvil */}
-        <div className="md:hidden flex items-center">
+        <div className="md:hidden flex items-center gap-2">
+          <TaskNotifications />
           <ModeToggle />
           <Button variant="ghost" size="icon" onClick={() => setIsMenuOpen(!isMenuOpen)}>
             {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
